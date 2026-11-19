@@ -1,0 +1,11 @@
+{
+  "name": "scout",
+  "version": "1.0.0",
+  "description": "Ask anything: scout searches the web, reads the best pages and explains what it found in plain words, with every fact linked to where it came from.",
+  "bin": { "scout": "bin/scout.js" },
+  "scripts": { "test": "node --test", "start": "node bin/scout.js" },
+  "engines": { "node": ">=18" },
+  "license": "MIT",
+  "repository": "github:dpatel7-dev/scout",
+  "files": ["bin", "src", "web", "install.sh", "install.ps1", "README.md", "CHANGELOG.md"]
+}
