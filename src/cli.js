@@ -8,7 +8,7 @@ const os = require('os');
 const path = require('path');
 const A = require('./ansi');
 const AI = require('./ai');
-const { answer } = require('./answer');
+const { answer, kindOf } = require('./answer');
 const pkg = require('../package.json');
 
 const home = () => process.env.SCOUT_HOME || path.join(os.homedir(), '.scout');
@@ -23,6 +23,8 @@ const HELP = `
   scout <your question>          get the answer right here, for example:
                                    scout how do noise cancelling headphones work
                                    scout best free video editor for mac
+  pbpaste | scout                what you copied, tidied up and explained
+  cat notes.txt | scout <ask>    ask about a file, for example: cat essay.txt | scout fix my spelling
   scout update                   get the newest scout
   scout uninstall                remove scout (add --all to remove its history too)
   scout --version                which scout this is
@@ -32,7 +34,24 @@ const HELP = `
 function render(md, width) {
   const w = Math.max(30, Math.min(100, width) - 4);
   const out = [];
-  for (const raw of String(md).split('\n')) {
+  // tables: line the columns up
+  const lines = [];
+  let table = [];
+  const flushTable = () => {
+    if (!table.length) return;
+    const rows = table.map((l) => l.replace(/^\s*\||\|\s*$/g, '').split('|').map((c) => c.trim().replace(/\*\*/g, '')));
+    const widths = rows[0].map((_, i) => Math.max(...rows.map((r) => A.vwidth(r[i] || ''))));
+    rows.forEach((r, k) => lines.push('\u0003' + r.map((c, i) => (k === 0 ? A.paint(c, { bold: true, fg: C.dim }) : c) + ' '.repeat(Math.max(0, widths[i] - A.vwidth(c)))).join('   ')));
+    table = [];
+  };
+  for (const l of String(md).split('\n')) {
+    if (/^\s*\|/.test(l)) { if (!/^\s*\|?\s*:?-{3,}/.test(l)) table.push(l); continue; }
+    flushTable();
+    lines.push(l);
+  }
+  flushTable();
+  for (const raw of lines) {
+    if (raw.startsWith('\u0003')) { out.push('  ' + raw.slice(1)); continue; }
     let line = raw.replace(/\s+$/, '');
     if (!line.trim()) { if (out.length && out[out.length - 1] !== '') out.push(''); continue; }
     if (/^\s*\|?\s*:?-{3,}/.test(line)) continue; // table rule
@@ -62,11 +81,24 @@ function render(md, width) {
   return out.join('\n');
 }
 
-async function terminal(q) {
+/** Everything piped in (pbpaste | scout), or null when you're typing. */
+function piped() {
+  if (process.stdin.isTTY) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    let s = '';
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (d) => { s += d; });
+    process.stdin.on('end', () => resolve(s.trim() ? s : null));
+    process.stdin.on('error', () => resolve(null));
+  });
+}
+
+async function terminal(q, pastedText = null) {
   const tty = process.stdout.isTTY;
   const width = process.stdout.columns || 80;
   say('');
-  say('  ' + A.paint('scout', { bold: true, fg: C.owl }) + paint('  ' + q, C.dim));
+  const pasted = pastedText ? [{ ...kindOf(pastedText), text: pastedText }] : [];
+  say('  ' + A.paint('scout', { bold: true, fg: C.owl }) + paint('  ' + (q || 'what you pasted') + (pasted.length ? `  (+ ${pastedText.trim().split('\n').length} pasted lines)` : ''), C.dim));
   const { model } = await AI.current(require('./server').config.load().model);
   const steps = { search: 'Searching the web…', read: 'Reading', write: 'Writing the answer…' };
   let status = '';
@@ -76,8 +108,8 @@ async function terminal(q) {
   let r;
   try {
     r = await answer(q, {
-      model, braveKey: require('./server').config.load().braveKey || '',
-      onStep: (s) => show(s.step === 'read' ? `Reading ${s.count} websites…` : steps[s.step] || ''),
+      model, pasted, braveKey: require('./server').config.load().braveKey || '',
+      onStep: (s) => show(s.step === 'read' ? `Reading ${s.count} ${s.count === 1 ? 'website' : 'websites'}…` : steps[s.step] || ''),
       onText: (t) => { text += t; },
     });
   } catch (e) {
@@ -114,6 +146,7 @@ async function main(argv) {
     case 'update': return life.update();
     case 'uninstall': return life.uninstall(rest.includes('--all'));
     case undefined: case 'open': case 'window': case '--no-open': {
+      if (first === undefined) { const text = await piped(); if (text) return terminal('', text); }
       const { serve } = require('./server');
       const s = await serve({ port: Number(process.env.SCOUT_PORT) || 0 });
       const { openWindow } = require('./open');
@@ -126,7 +159,7 @@ async function main(argv) {
       await new Promise(() => {});
       return;
     }
-    default: return terminal(argv.join(' '));
+    default: return terminal(argv.join(' '), await piped());
   }
 }
 

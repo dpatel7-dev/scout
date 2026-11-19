@@ -15,7 +15,12 @@ const PAGES = {
 };
 
 function answer(user) {
-  const q = (/Question: (.*)$/m.exec(user) || [])[1] || 'that';
+  if (/^PASTED/m.test(user)) {
+    if (/kind,|,name|^name,/m.test(user) || /a table/.test(user)) return '**This is a list of 3 people and their ages.**\n\n| Name | Age |\n| --- | --- |\n| Ana | 31 |\n| Ben | 27 |\n| Cy | 45 |\n\nThe oldest is Cy, and the average age is about 34.\nFOLLOWUPS: Sort it by age | Add a column | Make a chart';
+    return '**This is a small Python function that adds two numbers.**\n\n```python\ndef add(a, b):\n    # add them\n    return a + b\n```\n\n- It takes two numbers and gives back their sum.\n- There are no bugs.\nFOLLOWUPS: Add type hints | Write a test | Explain return';
+  }
+  if (/Message: (hi|hello|thanks)/i.test(user)) return 'Hi! Ask me anything, or paste something and I will explain it.\nFOLLOWUPS: What can you do? | Explain a web page | Tidy my notes';
+  const q = (/(?:Question|Message): (.*)$/m.exec(user) || [])[1] || 'that';
   const n = (user.match(/^\[\d+\]/gm) || []).length;
   return `**The sky looks blue because air scatters blue sunlight much more than red light.** [1][2]\n\n- Sunlight has every colour in it. [1]\n- Blue light travels in short waves, so tiny bits of air bounce it all over the sky. [2]\n- At sunset the light goes through more air, so the blue is used up and the sky turns red. [3]\n\n(${n} sources, about: ${q})\nFOLLOWUPS: Why are sunsets red? | Is the sky blue on Mars? | What is Rayleigh scattering?`;
 }

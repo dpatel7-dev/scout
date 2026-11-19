@@ -15,7 +15,7 @@ process.env.TOT_URL_OLLAMA = 'http://127.0.0.1:1/v1'; // no Ollama here
 process.env.SCOUT_NO_BROWSER = '1';
 
 const Search = require('../src/search');
-const { splitFollowups, cited } = require('../src/answer');
+const { splitFollowups, cited, plan, pastedBlock, kindOf } = require('../src/answer');
 const Fake = require('../dev/fake');
 
 test('DuckDuckGo results: real links, titles and snippets; ads left out', () => {
@@ -45,14 +45,39 @@ test('the follow-up questions are split off the answer', () => {
   assert.deepStrictEqual([...cited('a [1] b [3][1]')], [1, 3]);
 });
 
-/** Ask the server and collect its events. */
-async function ask(url, q, history = []) {
-  const r = await fetch(url + 'api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ q, history }) });
+test('scout searches only when it helps', () => {
+  assert.strictEqual(plan('why is the sky blue').web, true);
+  assert.strictEqual(plan('hi!').web, false, 'small talk');
+  assert.strictEqual(plan('thanks').web, false);
+  assert.strictEqual(plan('what does this do', { pasted: [{ text: 'x' }] }).web, false, 'the paste is the material');
+  assert.strictEqual(plan('is this the latest version?', { pasted: [{ text: 'x' }] }).web, true, 'unless they ask to look it up');
+  assert.strictEqual(plan('why is the sky blue', { search: false }).web, false, 'search switched off');
+  const u = plan('summarize https://example.com/a and https://example.com/b');
+  assert.deepStrictEqual(u.urls, ['https://example.com/a', 'https://example.com/b']);
+  assert.strictEqual(u.web, false, 'reads the links instead of searching');
+  assert.strictEqual(plan('', { pasted: [{ text: 'x' }] }).web, false);
+});
+
+test('pasted material is labelled for the AI, and very long pastes are cut', () => {
+  const b = pastedBlock([{ kind: 'code', lang: 'python', text: 'def f():\n    return 1' }, { kind: 'table', name: 'people.csv', text: 'a,b\n1,2' }]);
+  assert.match(b, /PASTED #1 \(code, python, 2 lines\)/);
+  assert.match(b, /PASTED #2 \(a table, from the file people\.csv, 2 lines\)/);
+  assert.match(pastedBlock([{ kind: 'text', text: 'x'.repeat(30000) }], 1000), /the rest was cut/);
+  assert.strictEqual(kindOf('{"a": 1}').kind, 'json');
+  assert.strictEqual(kindOf('def f():\n    return 1').kind, 'code');
+  assert.strictEqual(kindOf('a\tb\n1\t2').kind, 'table');
+  assert.strictEqual(kindOf('Dear Sam, thanks for the cake.').kind, 'text');
+});
+
+/** Send a message and collect the events. */
+async function ask(url, body) {
+  const r = await fetch(url + 'api/ask', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(typeof body === 'string' ? { q: body } : body) });
   const raw = await r.text();
   return raw.split('\n\n').filter(Boolean).map((b) => ({ type: /^event: (.*)$/m.exec(b)[1], data: JSON.parse(/^data: (.*)$/m.exec(b)[1]) }));
 }
+const textOf = (ev) => ev.filter((e) => e.type === 'text').map((e) => e.data).join('');
 
-test('a whole question: search, read, answer with sources and follow-ups', async () => {
+test('a whole chat: search and answer, a follow-up, a paste, a link, and the chat kept', async () => {
   const fake = await Fake.start();
   process.env.SCOUT_URL_DDG = `${fake.url}/html`;
   process.env.SCOUT_URL_WIKI = fake.url;
@@ -73,24 +98,50 @@ test('a whole question: search, read, answer with sources and follow-ups', async
     assert.ok(JSON.parse(fs.readFileSync(path.join(process.env.TOT_HOME, 'keys.json'), 'utf8')).groq, 'the key is shared with Tree of Thought');
 
     ev = await ask(s.url, 'why is the sky blue');
-    const steps = ev.filter((e) => e.type === 'step').map((e) => e.data.step);
-    assert.deepStrictEqual(steps, ['search', 'read', 'done', 'write']);
+    const chat = ev.find((e) => e.type === 'chat').data.id;
+    assert.deepStrictEqual(ev.filter((e) => e.type === 'step').map((e) => e.data.step), ['search', 'read', 'done', 'write']);
     const sources = ev.find((e) => e.type === 'sources').data;
     assert.ok(sources.some((x) => /Wikipedia/.test(x.title)), 'Wikipedia is one of them');
     assert.ok(sources.every((x) => x.n && x.url && x.domain && !('text' in x)), 'numbered, without the page text');
     assert.ok(!sources.some((x) => /Ads and cookies/.test(x.title)), 'a page with nothing to read is left out');
-    const text = ev.filter((e) => e.type === 'text').map((e) => e.data).join('');
-    assert.match(text, /\*\*The sky looks blue/);
-    assert.match(text, /\[1\]/);
-    assert.ok(!/FOLLOWUPS/.test(text), 'the follow-up line never shows');
-    const done = ev.find((e) => e.type === 'done').data;
-    assert.deepStrictEqual(done.followups, ['Why are sunsets red?', 'Is the sky blue on Mars?', 'What is Rayleigh scattering?']);
+    assert.match(textOf(ev), /\*\*The sky looks blue/);
+    assert.ok(!/FOLLOWUPS/.test(textOf(ev)), 'the follow-up line never shows');
+    assert.deepStrictEqual(ev.find((e) => e.type === 'done').data.followups, ['Why are sunsets red?', 'Is the sky blue on Mars?', 'What is Rayleigh scattering?']);
 
-    // it's remembered, and can be opened again
-    const st = await (await fetch(s.url + 'api/state')).json();
-    assert.strictEqual(st.recent[0].q, 'why is the sky blue');
-    const past = await (await fetch(s.url + 'api/past/' + done.id)).json();
-    assert.match(past.a, /sky looks blue/);
+    // small talk in the same chat: no searching, and the earlier turn goes along
+    const before = fake.log.length;
+    ev = await ask(s.url, { q: 'thanks', chat });
+    assert.match(textOf(ev), /^Hi!/);
+    assert.ok(!fake.log.slice(before).some((p) => p.startsWith('/html')), 'no web search for small talk');
+    assert.strictEqual(ev.find((e) => e.type === 'done').data.searched, false);
+
+    // paste some code with no question: tidied up and explained, no searching
+    ev = await ask(s.url, { q: '', chat, pasted: [{ kind: 'code', lang: 'python', text: 'def add(a,b):\n  return a+b' }] });
+    assert.match(textOf(ev), /```python/);
+    assert.deepStrictEqual(ev.find((e) => e.type === 'sources').data, []);
+
+    // a link: scout reads that page, it becomes source 1
+    ev = await ask(s.url, { q: `what does this say? ${fake.url}/page/1`, chat });
+    const linked = ev.find((e) => e.type === 'sources').data;
+    assert.strictEqual(linked.length, 1);
+    assert.match(linked[0].title, /NASA/);
+
+    // the whole chat is kept, and can be opened and deleted
+    let st = await (await fetch(s.url + 'api/state')).json();
+    assert.strictEqual(st.chats[0].id, chat);
+    assert.strictEqual(st.chats[0].title, 'why is the sky blue');
+    const full = await (await fetch(s.url + 'api/chat/' + chat)).json();
+    assert.strictEqual(full.turns.length, 4);
+    assert.strictEqual(full.turns[2].pasted[0].lang, 'python');
+    // try again replaces the last answer instead of adding one
+    await ask(s.url, { q: 'thanks', chat, retry: true });
+    assert.strictEqual((await (await fetch(s.url + 'api/chat/' + chat)).json()).turns.length, 4);
+    st = await (await fetch(s.url + `api/chat/${chat}/delete`, { method: 'POST' })).json();
+    assert.ok(!st.chats.some((c) => c.id === chat));
+
+    // nothing to answer
+    ev = await ask(s.url, { q: '  ' });
+    assert.match(ev[0].data.message, /Type a question/);
 
     // only this computer, at the secret address
     assert.strictEqual((await fetch(s.url.replace(/\/[^/]+\/$/, '/nope/'))).status, 404);
@@ -100,12 +151,22 @@ test('a whole question: search, read, answer with sources and follow-ups', async
   }
 });
 
+test('chats from scout 1.0 come along', () => {
+  const { chats, home } = require('../src/server');
+  fs.mkdirSync(home(), { recursive: true });
+  try { fs.unlinkSync(path.join(home(), 'chats.json')); } catch { /* fine */ }
+  fs.writeFileSync(path.join(home(), 'history.json'), JSON.stringify([{ id: 'old1', q: 'old question', a: 'old answer', at: 5, sources: [] }]));
+  const all = chats.load();
+  assert.strictEqual(all[0].title, 'old question');
+  assert.strictEqual(all[0].turns[0].a, 'old answer');
+});
+
 test('the page is served with its settings filled in', async () => {
   const { serve } = require('../src/server');
   const s = await serve();
   try {
     const html = await (await fetch(s.url)).text();
-    assert.match(html, /What do you want to know\?/);
+    assert.match(html, /Ask anything, or paste something/);
     assert.ok(!html.includes('/*SCOUT*/{}'), 'config filled in');
   } finally { await s.close(); }
 });

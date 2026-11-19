@@ -36,17 +36,25 @@ irm https://djp7.pythonanywhere.com/scout/install.ps1 | iex
 
 Or open **Project CLI Access** (`pca`) and pick Pip's card.
 
+## Paste anything
+
+Paste code, a table, JSON, notes or a whole essay into the box (or drag a file onto it). It becomes a
+neat card. Press Enter and Pip tidies it up and explains it, or ask about it: "find the bug",
+"make this shorter", "who is the oldest?". Paste a link and scout reads that page.
+
 ## Use it
 
 | To | Type |
 | --- | --- |
 | Open scout in a window, and type questions there | `scout` |
 | Get an answer right in Terminal | `scout why is the sky blue` |
+| Explain what you copied | `pbpaste \| scout` |
+| Ask about a file | `cat notes.txt \| scout fix my spelling` |
 | Get the newest scout | `scout update` |
 
-In the window: type a question and press Enter. Click a numbered chip to open that website.
-"People also want to know" has questions you can ask next with one click, and the box at the
-bottom takes follow-ups ("and how much does it cost?").
+In the window: type a question and press Enter, then keep chatting. Click a numbered chip to open
+the website a fact came from. Your chats are in the list on the left (the button at the top left).
+Under the box: **Search the web** (on by default), **Go deeper** for a fuller answer, and which AI answers.
 
 ## The AI
 

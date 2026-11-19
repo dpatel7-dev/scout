@@ -1,6 +1,6 @@
 {
   "name": "scout",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Ask anything: scout searches the web, reads the best pages and explains what it found in plain words, with every fact linked to where it came from.",
   "bin": { "scout": "bin/scout.js" },
   "scripts": { "test": "node --test", "start": "node bin/scout.js" },
