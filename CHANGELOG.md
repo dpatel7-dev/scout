@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1
+- The deer, rabbits and other animals in the forest walk forwards now (they were walking backwards).
+
 ## 1.2.0
 - **A living pixel forest instead of the orange stripes.** In dark mode it's night: stars twinkle, the moon glows, mist drifts between the trees, fireflies blink, a shooting star goes by now and then, and an owl sits on a branch (and sometimes flies across). In light mode it's day: the sun, clouds drifting, falling leaves, butterflies, and a deer or a rabbit wandering through. The background stays plain white or black. The trees sway in the wind with the odd gust, and every so often a tree rustles and a bird flies off.
 - It fades back while you're chatting, and holds still for people who turn on "reduce motion".

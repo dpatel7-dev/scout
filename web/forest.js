@@ -17,7 +17,7 @@
  *     clear: [0.24, 0.76],        // keep the tall trees out of this part (the middle)
  *     share: 0.44,                // how much of the height the forest takes
  *     fps: 24,
- *     mascot: 'owl' | 'fox',      // who lives here
+ *     mascot: 'owl' | 'fox' | 'hedgehog',  // who lives here
  *   });
  *   f.redraw()   after a theme change      f.hush(ms)   hold still briefly (while typing)
  */
@@ -71,6 +71,11 @@
     ['o.o.........', 'ooo.........', 'okoo........', 'woood.ooooo.', '.woooooooooo', '..oooooooodw', '..d.d...d.d.', '..k.k...k.k.'],
     ['o.o.........', 'ooo.........', 'okoo........', 'woood.ooooo.', '.woooooooooo', '..oooooooodw', '...d.d.d.d..', '...k.k.k.k..'],
   ];
+  var HEDGEW = [
+    ['....k.k.k.', '...kSkSkSk', '.fFSSsSSSS', 'NEFFSSSSsS', '.FFFFFFFFf', '..L..L..L.'],
+    ['....k.k.k.', '...kSkSkSk', '.fFSSsSSSS', 'NEFFSSSSsS', '.FFFFFFFFf', '.L..L..L..'],
+  ];
+  var HEDGE = { S: '#5e4030', s: '#7d5a40', k: '#b08a64', F: '#f2dcb8', f: '#dcbc90', E: '#1d1410', N: '#2a1a14', L: '#a8784e' };
   var BFLY = [['X.X', '.B.', 'X.X'], ['.X.', '.B.', '.X.']];
 
   function rng(seed) { var s = (seed >>> 0) || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000; }; }
@@ -314,9 +319,10 @@
     }
     function spawnWalker(t) {
       var dir = Math.random() < 0.5 ? 1 : -1;
-      var kind = opts.mascot === 'fox' && Math.random() < 0.6 ? 'fox' : Math.random() < 0.55 ? 'deer' : 'rabbit';
-      var w = kind === 'deer' ? 13 : kind === 'fox' ? 12 : 6;
-      actors.walkers.push({ kind: kind, dir: dir, x: dir > 0 ? -w - 2 : S.W + 2, y: S.bases[2] + (kind === 'rabbit' ? 1 : 0), v: kind === 'deer' ? 7 : kind === 'fox' ? 10 : 0, t: t, grazeAt: kind === 'deer' && Math.random() < 0.7 ? t + 3 + Math.random() * 6 : -1, hop: 0 });
+      var own = (opts.mascot === 'fox' || opts.mascot === 'hedgehog') && Math.random() < 0.6;
+      var kind = own ? opts.mascot : Math.random() < 0.55 ? 'deer' : 'rabbit';
+      var w = kind === 'deer' ? 13 : kind === 'fox' ? 12 : kind === 'hedgehog' ? 10 : 6;
+      actors.walkers.push({ kind: kind, dir: dir, x: dir > 0 ? -w - 2 : S.W + 2, y: S.bases[2] + (kind === 'rabbit' ? 1 : 0), v: kind === 'deer' ? 7 : kind === 'fox' ? 10 : kind === 'hedgehog' ? 6 : 0, t: t, grazeAt: kind === 'deer' && Math.random() < 0.7 ? t + 3 + Math.random() * 6 : -1, hop: 0 });
     }
 
     function frame(now) {
@@ -501,15 +507,15 @@
         var ja = t - (w.jump || -9);
         var up = ja < 0.35 ? Math.round(Math.sin(ja / 0.35 * Math.PI) * 3) : 0;
         if (ja < 0.35) w.x += w.dir * 26 * dt;
-        sprite(g, RABBIT[up ? 1 : 0], Math.round(w.x), w.y - 6 - up, S.night ? { E: P.rabbit, H: P.rabbit, B: P.rabbit, L: P.rabbit, K: P.eye } : { E: '#8a7a6c', H: P.rabbit, B: P.rabbit, L: '#8a7a6c', K: '#2a1a12' }, w.dir < 0);
+        sprite(g, RABBIT[up ? 1 : 0], Math.round(w.x), w.y - 6 - up, S.night ? { E: P.rabbit, H: P.rabbit, B: P.rabbit, L: P.rabbit, K: P.eye } : { E: '#8a7a6c', H: P.rabbit, B: P.rabbit, L: '#8a7a6c', K: '#2a1a12' }, w.dir > 0);
       } else {
         var grazing = w.grazeAt > 0 && t > w.grazeAt && t < w.grazeAt + 2.6;
         if (!grazing) w.x += w.dir * w.v * dt;
-        var rows = w.kind === 'fox' ? FOXW[Math.floor(t * 6) % 2] : grazing ? DEER_GRAZE : DEER[Math.floor(t * 4) % 2];
-        var ink = w.kind === 'fox' ? FOX : S.night ? { A: P.deer[1], H: P.deer[0], B: P.deer[0], L: P.deer[1], T: P.deer[0] } : { A: '#6a4a2a', H: P.deer[0], B: P.deer[0], L: P.deer[1], T: P.belly };
+        var rows = w.kind === 'fox' ? FOXW[Math.floor(t * 6) % 2] : w.kind === 'hedgehog' ? HEDGEW[Math.floor(t * 8) % 2] : grazing ? DEER_GRAZE : DEER[Math.floor(t * 4) % 2];
+        var ink = w.kind === 'fox' ? FOX : w.kind === 'hedgehog' ? HEDGE : S.night ? { A: P.deer[1], H: P.deer[0], B: P.deer[0], L: P.deer[1], T: P.deer[0] } : { A: '#6a4a2a', H: P.deer[0], B: P.deer[0], L: P.deer[1], T: P.belly };
         var oy = w.y - rows.length;
-        sprite(g, rows, Math.round(w.x), oy, ink, w.dir < 0);
-        if (S.night && w.kind !== 'fox' && !grazing) { g.fillStyle = P.eye; g.fillRect(Math.round(w.x) + (w.dir < 0 ? 11 : 1), oy + 3, 1, 1); }
+        sprite(g, rows, Math.round(w.x), oy, ink, w.dir > 0);
+        if (S.night && w.kind === 'deer' && !grazing) { g.fillStyle = P.eye; g.fillRect(Math.round(w.x) + (w.dir > 0 ? 11 : 1), oy + 3, 1, 1); }
       }
       return w.x > -20 && w.x < S.W + 20;
     }
