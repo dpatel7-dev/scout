@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.0
+- **A living pixel forest instead of the orange stripes.** In dark mode it's night: stars twinkle, the moon glows, mist drifts between the trees, fireflies blink, a shooting star goes by now and then, and an owl sits on a branch (and sometimes flies across). In light mode it's day: the sun, clouds drifting, falling leaves, butterflies, and a deer or a rabbit wandering through. The background stays plain white or black. The trees sway in the wind with the odd gust, and every so often a tree rustles and a bird flies off.
+- It fades back while you're chatting, and holds still for people who turn on "reduce motion".
+
 ## 1.1.0
 - **scout is a chat now.** Keep asking in the same conversation ("and how big is it?"), and find your old chats in the list on the left. Try again, copy, and stop are under each answer.
 - **Paste anything.** Code, a table, JSON, notes, an essay, a whole file: it turns into a neat card (code is coloured, tables are tables, JSON is lined up). Press Enter with no question and Pip tidies it up and explains it, or ask about it ("find the bug", "who is oldest?"). The + button and dragging a file in work too.

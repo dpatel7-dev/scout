@@ -7,9 +7,10 @@
 <link rel="icon" id="icon" href="data:,">
 <meta name="theme-color" content="#161618">
 <style>
-/* scout: one quiet room with a warm glow rising from the floor. Warm stripes of
-   light behind everything, Pip in the middle, one box to type or paste into.
-   The glow dims once you're chatting so the words come first. */
+/* scout: a quiet clearing in a pixel forest. At night (dark) there are stars,
+   the moon and fireflies; by day (light) the sun, clouds and butterflies, and
+   now and then a bird flies off. Pip in the middle, one box to type or paste
+   into. The forest dims once you're chatting so the words come first. */
 :root {
   --bg: #161618; --panel: #222226; --panel-2: #2b2b30; --line: #36363c; --ink: #ececee; --dim: #a3a2a9; --faint: #6e6d74;
   --accent: #ef6a1f; --accent-soft: rgba(239, 106, 31, .16); --amber: #f2a93b; --link: #8ab8ff; --ok: #6fd39a; --bad: #ff7a8a;
@@ -35,9 +36,9 @@ a { color: var(--link); text-underline-offset: 2px; }
 svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
 canvas.pip { image-rendering: pixelated; }
 
-/* the glow */
-#glow { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; transition: opacity .7s ease; }
-body.chatting #glow { opacity: .38; }
+/* the forest */
+#glow { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; image-rendering: pixelated; transition: opacity .7s ease; }
+body.chatting #glow { opacity: .3; }
 
 /* top bar */
 .top { position: fixed; top: 0; left: 0; right: 0; z-index: 20; display: flex; align-items: center; gap: 6px; padding: 10px 12px; pointer-events: none; }
@@ -279,6 +280,7 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 
 <dialog id="settings"><div class="sheet" id="sheet"></div></dialog>
 
+<script src="forest.js"></script>
 <script>
 (function () {
   'use strict';
@@ -331,34 +333,14 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
     document.querySelector('meta[name=theme-color]').content = dark ? '#161618' : '#fafaf9';
     drawGlow();
   }
-  function noise(i) { var v = Math.sin(i * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); }
-  function rgba(hex, a) { var n = parseInt(hex.slice(1), 16); return 'rgba(' + (n >> 16) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')'; }
-  // tall stripes of warm light rising from the floor, brightest at the sides
+  // the forest: night in dark mode, day in light mode
+  var forest = null;
   function drawGlow() {
-    var cv = $('glow'), W = innerWidth, H = innerHeight;
-    cv.width = W; cv.height = H;
-    var g = cv.getContext('2d');
-    var dark = isDark();
-    var pal = dark ? ['#5a230d', '#7a2f11', '#a33f15', '#c4521a', '#de6a22', '#ef8a30', '#b9481a', '#8e3713'] : ['#ffbd85', '#ffa96a', '#ff9a57', '#ffc799', '#ffb27a', '#ffd0a8'];
-    var colW = Math.max(38, Math.min(70, W / 19));
-    var n = Math.ceil(W / colW);
-    for (var i = 0; i < n; i++) {
-      var d = Math.abs(i - (n - 1) / 2) / Math.max(1, (n - 1) / 2); // 0 in the middle, 1 at the edges
-      var reach = 0.32 + 0.38 * Math.pow(d, 1.3) + 0.14 * noise(i);
-      var strength = (dark ? 0.78 : 0.62) * (0.38 + 0.62 * Math.pow(d, 1.1)) * (0.75 + 0.25 * noise(i + 9));
-      var col = pal[Math.floor(noise(i + 3) * pal.length)];
-      var top = H * (1 - reach);
-      var gr = g.createLinearGradient(0, top, 0, H);
-      gr.addColorStop(0, rgba(col, 0));
-      gr.addColorStop(0.3, rgba(col, strength * 0.12));
-      gr.addColorStop(0.6, rgba(col, strength * 0.45));
-      gr.addColorStop(1, rgba(col, strength));
-      g.fillStyle = gr;
-      g.fillRect(Math.round(i * colW), top, Math.ceil(colW), H - top);
-    }
+    if (!window.Forest) return;
+    if (!forest) forest = Forest.start($('glow'), { night: isDark, clear: [0.25, 0.75], share: 0.42, mascot: 'owl' });
+    else forest.redraw();
   }
   paintTheme();
-  addEventListener('resize', drawGlow);
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paintTheme);
   $('themeBtn').onclick = function () { theme = isDark() ? 'light' : 'dark'; try { localStorage.setItem('scout-theme', theme); } catch (e) { /* fine */ } paintTheme(); };
 

@@ -92,6 +92,7 @@ function serve({ port = 0, token = crypto.randomBytes(16).toString('base64url') 
         const html = fs.readFileSync(PAGE, 'utf8').replace('/*SCOUT*/{}', () => JSON.stringify({ base: base + '/', version: pkg.version }).replace(/</g, '\\u003c'));
         return send(200, html, 'text/html; charset=utf-8');
       }
+      if (rest === '/forest.js' && req.method === 'GET') return send(200, fs.readFileSync(path.join(__dirname, '..', 'web', 'forest.js'), 'utf8'), 'text/javascript; charset=utf-8');
       if (rest === '/api/state' && req.method === 'GET') return send(200, await state());
       let m = /^\/api\/chat\/([\w-]+)$/.exec(rest);
       if (m && req.method === 'GET') { const c = chats.get(m[1]); return c ? send(200, c) : send(404, { error: 'That chat was deleted.' }); }
