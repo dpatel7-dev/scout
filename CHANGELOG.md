@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.2
+- Night in the forest is bluer, like moonlight.
+
 ## 1.2.1
 - The deer, rabbits and other animals in the forest walk forwards now (they were walking backwards).
 
