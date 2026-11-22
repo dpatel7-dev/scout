@@ -11,6 +11,7 @@ const AI = require('./ai');
 const { answer } = require('./answer');
 const pkg = require('../package.json');
 
+const Look = require('./look');
 const PAGE = path.join(__dirname, '..', 'web', 'scout.html');
 const home = () => process.env.SCOUT_HOME || path.join(os.homedir(), '.scout');
 const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
@@ -89,9 +90,10 @@ function serve({ port = 0, token = crypto.randomBytes(16).toString('base64url') 
       if (!u.pathname.startsWith(base)) return send(404, 'not here\n', 'text/plain');
       const rest = u.pathname.slice(base.length) || '/';
       if (rest === '/' && req.method === 'GET') {
-        const html = fs.readFileSync(PAGE, 'utf8').replace('/*SCOUT*/{}', () => JSON.stringify({ base: base + '/', version: pkg.version }).replace(/</g, '\\u003c'));
+        const html = Look.inject(fs.readFileSync(PAGE, 'utf8').replace('/*SCOUT*/{}', () => JSON.stringify({ base: base + '/', version: pkg.version }).replace(/</g, '\\u003c')), Look.read(), base + '/__look');
         return send(200, html, 'text/html; charset=utf-8');
       }
+      if (rest === '/__look' && req.method === 'GET') return send(200, { look: Look.read() }); // light or dark, set in pca
       if (rest === '/forest.js' && req.method === 'GET') return send(200, fs.readFileSync(path.join(__dirname, '..', 'web', 'forest.js'), 'utf8'), 'text/javascript; charset=utf-8');
       if (rest === '/api/state' && req.method === 'GET') return send(200, await state());
       let m = /^\/api\/chat\/([\w-]+)$/.exec(rest);

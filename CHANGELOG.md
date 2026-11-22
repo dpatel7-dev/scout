@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.0
+- **Light or dark, set once for every app:** press **L** in pca (or `pca look light`, `pca look dark`, `pca look auto`). scout's window follows it (the sun/moon button still switches just this window).
+
 ## 1.2.2
 - Night in the forest is bluer, like moonlight.
 

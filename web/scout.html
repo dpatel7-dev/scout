@@ -325,6 +325,9 @@ dialog::backdrop { background: rgba(0, 0, 0, .45); }
 
   // ── light or dark, and the glow ──
   var theme = (function () { try { return localStorage.getItem('scout-theme') || 'auto'; } catch (e) { return 'auto'; } })();
+  // light or dark for every app is set in pca: when that changes, it wins over this window's own button
+  (function () { try { var L = window.__LOOK__ || 'auto'; if (localStorage.getItem('scout-look') !== L) { localStorage.setItem('scout-look', L); theme = 'auto'; localStorage.removeItem('scout-theme'); } } catch (e) { /* fine */ } })();
+  addEventListener('lookchange', function () { theme = 'auto'; try { localStorage.setItem('scout-look', window.__LOOK__); localStorage.removeItem('scout-theme'); } catch (e) { /* fine */ } paintTheme(); });
   function isDark() { return theme === 'dark' || (theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches); }
   function paintTheme() {
     var dark = isDark();
